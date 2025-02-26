@@ -21,6 +21,7 @@ import torch
 import tyro
 import nerfstudio
 import pkg_resources
+import pdb
 
 from jaxtyping import Float
 from rich import box, style
@@ -362,7 +363,7 @@ class RenderCameraPath(BaseRender):
     """Name of the renderer outputs to use. rgb, depth, etc. concatenates them along y axis"""
     camera_path_filename: Path = Path("camera_path.json")
     """Filename of the camera path to render."""
-    output_format: Literal["images", "video"] = "video"
+    output_format: Literal["images", "video"] = "images"
     """How to save output data."""
     
 
@@ -397,21 +398,34 @@ class RenderCameraPath(BaseRender):
 
         with open(self.camera_path_filename, "r", encoding="utf-8") as f:
             camera_path = json.load(f)
+        
+        # print(f"DEBUG (before conversion): camera_type={camera_path['camera_type']}, type={type(camera_path['camera_type'])}")
+
+        # pdb.set_trace()
+        # print(f"DEBUG: camera_path: {camera_path}")
+        # print(f"DEBUG: camera path items: {camera_path.items()}")
         seconds = camera_path["seconds"]
         crop_data = get_crop_from_json(camera_path)
         camera_path = get_path_from_json(camera_path)
 
-        if camera_path.camera_type[0] == CameraType.OMNIDIRECTIONALSTEREO_L.value:
-            # temp folder for writing left and right view renders
-            temp_folder_path = self.output_path.parent / (self.output_path.stem + "_temp")
+        # camera_type = int(camera_path["camera_type"].flatten()[0].item())  # Extract first value
+        # # camera_path["camera_type"] = CameraType(camera_type)  # Convert to Enum
 
-            Path(temp_folder_path).mkdir(parents=True, exist_ok=True)
-            left_eye_path = temp_folder_path / "ods_render_Left.mp4"
+        # print(f"DEBUG: camera_type loaded from JSON: {camera_path.camera_type}")  # Add this line
+        # print(f"DEBUG: Available CameraTypes: {list(CameraType)}")  # Print valid Enum values
+        # print(f"DEBUG: camera_path.camera_type[0]: {camera_path.camera_type[0].flatten()}")  # Add this line
 
-            self.output_path = left_eye_path
+        # if camera_path.camera_type[0] == CameraType.OMNIDIRECTIONALSTEREO_L.value:
+        #     # temp folder for writing left and right view renders
+        #     temp_folder_path = self.output_path.parent / (self.output_path.stem + "_temp")
 
-            CONSOLE.print("[bold green]:goggles: Omni-directional Stereo VR :goggles:")
-            CONSOLE.print("Rendering left eye view")
+        #     Path(temp_folder_path).mkdir(parents=True, exist_ok=True)
+        #     left_eye_path = temp_folder_path / "ods_render_Left.mp4"
+
+        #     self.output_path = left_eye_path
+
+        #     CONSOLE.print("[bold green]:goggles: Omni-directional Stereo VR :goggles:")
+        #     CONSOLE.print("Rendering left eye view")
 
         # add mp4 suffix to video output if none is specified
         if self.output_format == "video" and str(self.output_path.suffix) == "":
@@ -431,55 +445,55 @@ class RenderCameraPath(BaseRender):
             depth_near_plane=self.depth_near_plane,
             depth_far_plane=self.depth_far_plane,
             colormap_options=self.colormap_options
-        )
+        )       
 
-        if camera_path.camera_type[0] == CameraType.OMNIDIRECTIONALSTEREO_L.value:
-            # declare paths for left and right renders
+        # if camera_path.camera_type[0] == CameraType.OMNIDIRECTIONALSTEREO_L.value:
+        #     # declare paths for left and right renders
 
-            left_eye_path = self.output_path
-            right_eye_path = left_eye_path.parent / "ods_render_Right.mp4"
+        #     left_eye_path = self.output_path
+        #     right_eye_path = left_eye_path.parent / "ods_render_Right.mp4"
 
-            self.output_path = right_eye_path
-            camera_path.camera_type[0] = CameraType.OMNIDIRECTIONALSTEREO_R.value
+        #     self.output_path = right_eye_path
+        #     camera_path.camera_type[0] = CameraType.OMNIDIRECTIONALSTEREO_R.value
 
-            CONSOLE.print("Rendering right eye view")
-            _render_trajectory_video(
-                pipeline,
-                camera_path,
-                output_filename=self.output_path,
-                rendered_output_names=self.rendered_output_names,
-                rendered_resolution_scaling_factor=1.0 / self.downscale_factor,
-                crop_data=crop_data,
-                seconds=seconds,
-                output_format=self.output_format,
-                image_format=self.image_format,
-                jpeg_quality=self.jpeg_quality,
-                depth_near_plane=self.depth_near_plane,
-                depth_far_plane=self.depth_far_plane,
-                gt_visibility_path=self.visibility_path,
-                colormap_options=self.colormap_options
-            )
+        #     CONSOLE.print("Rendering right eye view")
+        #     _render_trajectory_video(
+        #         pipeline,
+        #         camera_path,
+        #         output_filename=self.output_path,
+        #         rendered_output_names=self.rendered_output_names,
+        #         rendered_resolution_scaling_factor=1.0 / self.downscale_factor,
+        #         crop_data=crop_data,
+        #         seconds=seconds,
+        #         output_format=self.output_format,
+        #         image_format=self.image_format,
+        #         jpeg_quality=self.jpeg_quality,
+        #         depth_near_plane=self.depth_near_plane,
+        #         depth_far_plane=self.depth_far_plane,
+        #         gt_visibility_path=self.visibility_path,
+        #         colormap_options=self.colormap_options
+        #     )
 
-            # stack the left and right eye renders for final output
-            self.output_path = Path(str(left_eye_path.parent)[:-5] + ".mp4")
-            ffmpeg_ods_command = ""
-            if self.output_format == "video":
-                ffmpeg_ods_command = f'ffmpeg -y -i "{left_eye_path}" -i "{right_eye_path}" -filter_complex "[0:v]pad=iw:2*ih[int];[int][1:v]overlay=0:h" -c:v libx264 -crf 23 -preset veryfast "{self.output_path}"'
-                run_command(ffmpeg_ods_command, verbose=False)
-            if self.output_format == "images":
-                # create a folder for the stacked renders
-                self.output_path = Path(str(left_eye_path.parent)[:-5])
-                self.output_path.mkdir(parents=True, exist_ok=True)
-                if self.image_format == "png":
-                    ffmpeg_ods_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.png")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.png")}" -filter_complex vstack -start_number 0 "{str(self.output_path)+"//%05d.png"}"'
-                elif self.image_format == "jpeg":
-                    ffmpeg_ods_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.jpg")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.jpg")}" -filter_complex vstack -start_number 0 "{str(self.output_path)+"//%05d.jpg"}"'
-                run_command(ffmpeg_ods_command, verbose=False)
+        #     # stack the left and right eye renders for final output
+        #     self.output_path = Path(str(left_eye_path.parent)[:-5] + ".mp4")
+        #     ffmpeg_ods_command = ""
+        #     if self.output_format == "video":
+        #         ffmpeg_ods_command = f'ffmpeg -y -i "{left_eye_path}" -i "{right_eye_path}" -filter_complex "[0:v]pad=iw:2*ih[int];[int][1:v]overlay=0:h" -c:v libx264 -crf 23 -preset veryfast "{self.output_path}"'
+        #         run_command(ffmpeg_ods_command, verbose=False)
+        #     if self.output_format == "images":
+        #         # create a folder for the stacked renders
+        #         self.output_path = Path(str(left_eye_path.parent)[:-5])
+        #         self.output_path.mkdir(parents=True, exist_ok=True)
+        #         if self.image_format == "png":
+        #             ffmpeg_ods_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.png")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.png")}" -filter_complex vstack -start_number 0 "{str(self.output_path)+"//%05d.png"}"'
+        #         elif self.image_format == "jpeg":
+        #             ffmpeg_ods_command = f'ffmpeg -y -pattern_type glob -i "{str(left_eye_path.with_suffix("") / "*.jpg")}"  -pattern_type glob -i "{str(right_eye_path.with_suffix("") / "*.jpg")}" -filter_complex vstack -start_number 0 "{str(self.output_path)+"//%05d.jpg"}"'
+        #         run_command(ffmpeg_ods_command, verbose=False)
 
-            # remove the temp files directory
-            if str(left_eye_path.parent)[-5:] == "_temp":
-                shutil.rmtree(left_eye_path.parent, ignore_errors=True)
-            CONSOLE.print("[bold green]Final ODS Render Complete")
+        #     # remove the temp files directory
+        #     if str(left_eye_path.parent)[-5:] == "_temp":
+        #         shutil.rmtree(left_eye_path.parent, ignore_errors=True)
+        #     CONSOLE.print("[bold green]Final ODS Render Complete")
 
 
 @dataclass

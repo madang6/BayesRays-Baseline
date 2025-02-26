@@ -1,0 +1,10 @@
+LICENSE
+README.md
+pyproject.toml
+bayesrays/__init__.py
+bayesrays.egg-info/PKG-INFO
+bayesrays.egg-info/SOURCES.txt
+bayesrays.egg-info/dependency_links.txt
+bayesrays.egg-info/entry_points.txt
+bayesrays.egg-info/requires.txt
+bayesrays.egg-info/top_level.txt

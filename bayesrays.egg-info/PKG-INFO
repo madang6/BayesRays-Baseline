@@ -1,0 +1,8 @@
+Metadata-Version: 2.2
+Name: bayesrays
+Version: 0.1
+License-File: LICENSE
+Requires-Dist: torch>=2.0.1
+Requires-Dist: torchvision>=0.15.2
+Requires-Dist: nerfstudio>=0.3.1
+Requires-Dist: torchtyping>=0.1.4
